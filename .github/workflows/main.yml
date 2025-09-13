@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   fetch_subs:
+    # S'exécute seulement sur schedule ou workflow_dispatch
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -38,7 +39,8 @@ jobs:
           git push origin main --force
 
   release:
-    if: github.event_name == 'push'
+    # S'exécute seulement sur push vers main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Wait before starting
