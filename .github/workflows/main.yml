@@ -40,8 +40,6 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    # Ne s'exécute que lors d'un workflow_dispatch manuel
-    if: github.event_name == 'workflow_dispatch'
     
     steps:
       - name: Checkout code
