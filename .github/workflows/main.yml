@@ -40,7 +40,6 @@ jobs:
   release:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    needs: fetch_subs
     steps:
       - name: Wait before starting
         run: |
