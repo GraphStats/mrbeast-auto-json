@@ -13,6 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Wait before starting
+        run: |
+          echo "Waiting 15 seconds to avoid conflicts..."
+          sleep 15
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -29,24 +34,19 @@ jobs:
           set -e
           VERSION_FILE="vertion.json"
 
-          # Créer vertion.json si absent
           if [ ! -f $VERSION_FILE ]; then
             echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
             echo "$VERSION_FILE created with version V1.0.0"
           fi
 
-          # Lire version actuelle
           version=$(node -pe "require('./$VERSION_FILE').vertion")
           echo "Current version: $version"
 
-          # Supprimer 'V' et séparer en majeur, mineur, patch
           version_numbers=${version#V}
           IFS='.' read -r major minor patch <<< "$version_numbers"
 
-          # Incrémenter patch
           patch=$((patch + 1))
 
-          # Gestion overflow
           if [ $patch -gt 9 ]; then
             patch=0
             minor=$((minor + 1))
@@ -59,7 +59,6 @@ jobs:
           new_version="V$major.$minor.$patch"
           echo "New version: $new_version"
 
-          # Mettre à jour vertion.json
           node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
 
           echo "new_version=$new_version" >> $GITHUB_ENV
@@ -69,17 +68,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Synchroniser avec le remote pour éviter tout conflit
           git fetch origin main
           git reset --hard origin/main
 
           git add vertion.json
           git diff --cached --quiet || git commit -m "Bump version to ${{ env.new_version }}"
-
-          # Pause pour laisser le temps aux autres pushes
-          echo "Waiting 15 seconds before pushing..."
-          sleep 15
-
           git push --force https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
 
       - name: Create Release
