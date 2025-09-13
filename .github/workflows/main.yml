@@ -19,33 +19,37 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # Fetch subscriber count
+      # Fetch subscriber count (temp file, pour éviter de réécrire inutilement)
       - name: Fetch subscriber count
         run: |
           curl -s https://backend.mixerno.space/api/youtube/estv3/UCX6OQ3DkcsbYNE6H8uQQuVA \
-          | jq '{subscriberCount: .items[0].statistics.subscriberCount}' > mrbeast.json
+          | jq '{subscriberCount: .items[0].statistics.subscriberCount}' > new_mrbeast.json
 
-      # Bump version
+          if [ ! -f mrbeast.json ] || ! cmp -s new_mrbeast.json mrbeast.json; then
+            mv new_mrbeast.json mrbeast.json
+            echo "mrbeast.json updated"
+          else
+            echo "No changes in subscriber count"
+            rm new_mrbeast.json
+          fi
+
+      # Bump version (toujours exécuté)
       - name: Bump version
         id: version
         run: |
           VERSION_FILE="vertion.json"
 
-          # Créer le fichier s'il n'existe pas
           if [ ! -f $VERSION_FILE ]; then
             echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
             echo "$VERSION_FILE created with version V1.0.0"
           fi
 
-          # Lire la version actuelle avec jq (pas require)
-          version=$(jq -r '.vertion' $VERSION_FILE)
+          version=$(node -pe "require('./$VERSION_FILE').vertion")
           echo "Current version: $version"
 
-          # Extraire major/minor/patch
           version_numbers=${version#V}
           IFS='.' read -r major minor patch <<< "$version_numbers"
 
-          # Incrément patch
           patch=$((patch + 1))
 
           if [ $patch -gt 9 ]; then
@@ -60,8 +64,7 @@ jobs:
           new_version="V$major.$minor.$patch"
           echo "New version: $new_version"
 
-          # Réécrire le fichier avec la nouvelle version
-          jq -n --arg v "$new_version" '{vertion:$v}' > $VERSION_FILE
+          node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
 
           echo "new_version=$new_version" >> $GITHUB_ENV
 
@@ -75,7 +78,8 @@ jobs:
           git reset --hard origin/main
 
           git add mrbeast.json vertion.json
-          git diff --cached --quiet || git commit -m "Update subs + bump version to ${{ env.new_version }} [skip ci]"
+          git commit -m "Update subs + bump version to ${{ env.new_version }} [skip ci]" || echo "No changes in mrbeast.json, but version bumped"
+          
           git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
 
       # Create GitHub Release
