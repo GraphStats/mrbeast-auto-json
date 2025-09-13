@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0  # récupère tout l’historique
+          fetch-depth: 0
 
       - name: Fetch subscriber count
         run: |
@@ -27,6 +27,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git reset --hard origin/main
           git add mrbeast.json
           git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
-          git push --force origin main
+          git push origin main --force
