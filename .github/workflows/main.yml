@@ -1,4 +1,4 @@
-name: Fetch Subs & Auto Release
+name: Fetch MrBeast Subs & Auto Release
 
 on:
   schedule:
@@ -11,42 +11,36 @@ permissions:
 jobs:
   fetch_and_release:
     runs-on: ubuntu-latest
+
     steps:
-      # Checkout repo
+      - name: Wait before starting
+        run: |
+          echo "Waiting 15 seconds to avoid conflicts..."
+          sleep 15
+
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # Fetch subscriber count (temp file, pour éviter de réécrire inutilement)
       - name: Fetch subscriber count
         run: |
           curl -s https://backend.mixerno.space/api/youtube/estv3/UCX6OQ3DkcsbYNE6H8uQQuVA \
-          | jq '{subscriberCount: .items[0].statistics.subscriberCount}' > new_mrbeast.json
+          | jq '{subscriberCount: .items[0].statistics.subscriberCount}' > mrbeast.json
 
-          if [ ! -f mrbeast.json ] || ! cmp -s new_mrbeast.json mrbeast.json; then
-            mv new_mrbeast.json mrbeast.json
-            echo "mrbeast.json updated"
-          else
-            echo "No changes in subscriber count"
-            rm new_mrbeast.json
-          fi
-
-      # Bump version (toujours exécuté)
-      - name: Bump version
+      - name: Read and bump version
         id: version
         run: |
+          set -e
           VERSION_FILE="vertion.json"
 
-          # Crée le fichier s'il n'existe pas
           if [ ! -f $VERSION_FILE ]; then
             echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
             echo "$VERSION_FILE created with version V1.0.0"
           fi
 
-          # Lecture de la version
-          version=$(jq -r '.vertion' $VERSION_FILE)
+          version=$(node -pe "require('./$VERSION_FILE').vertion")
           echo "Current version: $version"
 
           version_numbers=${version#V}
@@ -66,13 +60,11 @@ jobs:
           new_version="V$major.$minor.$patch"
           echo "New version: $new_version"
 
-          # Écriture de la nouvelle version
-          jq -n --arg v "$new_version" '{vertion:$v}' > $VERSION_FILE
+          node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
 
           echo "new_version=$new_version" >> $GITHUB_ENV
 
-      # Commit and push changes
-      - name: Commit and push changes
+      - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -81,18 +73,12 @@ jobs:
           git reset --hard origin/main
 
           git add mrbeast.json vertion.json
-          if git diff --cached --quiet; then
-            echo "⚠️ No changes to commit"
-          else
-            git commit -m "Update subs + bump version to ${{ env.new_version }} [skip ci]"
-            git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
-          fi
+          git diff --cached --quiet || git commit -m "Update subscriber count & bump version ${{ env.new_version }}"
+          git push --force https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
 
-      # Create GitHub Release
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          token: ${{ secrets.GH_TOKEN }}
           tag: ${{ env.new_version }}
           name: ${{ env.new_version }}
           draft: false
