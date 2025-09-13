@@ -1,4 +1,4 @@
-name: Fetch MrBeast Subs
+name: Fetch Subs & Auto Release
 
 on:
   schedule:
@@ -9,26 +9,75 @@ permissions:
   contents: write
 
 jobs:
-  fetch_subs:
+  fetch_and_release:
     runs-on: ubuntu-latest
     steps:
+      # Checkout
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      # Fetch subscriber count
       - name: Fetch subscriber count
         run: |
           curl -s https://backend.mixerno.space/api/youtube/estv3/UCX6OQ3DkcsbYNE6H8uQQuVA \
           | jq '{subscriberCount: .items[0].statistics.subscriberCount}' > mrbeast.json
 
-      - name: Commit and push
+      # Handle version bump
+      - name: Bump version
+        id: version
+        run: |
+          VERSION_FILE="vertion.json"
+
+          if [ ! -f $VERSION_FILE ]; then
+            echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
+            echo "$VERSION_FILE created with version V1.0.0"
+          fi
+
+          version=$(node -pe "require('./$VERSION_FILE').vertion")
+          echo "Current version: $version"
+
+          version_numbers=${version#V}
+          IFS='.' read -r major minor patch <<< "$version_numbers"
+
+          patch=$((patch + 1))
+
+          if [ $patch -gt 9 ]; then
+            patch=0
+            minor=$((minor + 1))
+          fi
+          if [ $minor -gt 9 ]; then
+            minor=0
+            major=$((major + 1))
+          fi
+
+          new_version="V$major.$minor.$patch"
+          echo "New version: $new_version"
+
+          node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
+
+          echo "new_version=$new_version" >> $GITHUB_ENV
+
+      # Commit changes
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git fetch origin main
           git reset --hard origin/main
-          git add mrbeast.json
-          git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
-          git push origin main --force
+
+          git add mrbeast.json vertion.json
+          git diff --cached --quiet || git commit -m "Update subs + bump version to ${{ env.new_version }} [skip ci]"
+          git push --force https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
+
+      # Create GitHub Release
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ env.new_version }}
+          name: ${{ env.new_version }}
+          draft: false
+          prerelease: false
