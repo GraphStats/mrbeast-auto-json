@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   fetch_subs:
-    # S'exécute seulement sur schedule ou workflow_dispatch
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -35,19 +34,19 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           git add mrbeast.json
-          git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
-          git push origin main --force
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Update subscriber count [skip ci]"
+          git push origin main
 
   release:
-    # S'exécute seulement sur push vers main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: fetch_subs
+    if: success() && (github.event_name == 'push' || github.event_name == 'workdule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
-      - name: Wait before starting
-        run: |
-          echo "Waiting 15 seconds to avoid conflicts..."
-          sleep 15
-
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -97,13 +96,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin main
-          git reset --hard origin/main
-
           git add vertion.json
-          git diff --cached --quiet || git commit -m "Bump version to ${{ env.new_version }}"
-          git push --force https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No version changes to commit"
+          else
+            git commit -m "Bump version to ${{ env.new_version }}"
+            git push origin main
+          fi
 
       - name: Create Release
         uses: ncipollo/release-action@v1
