@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # ⬅️ donne accès en écriture
+  contents: write
 
 jobs:
   fetch_subs:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # ⬅️ utilise le token fourni par GitHub
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch subscriber count
         run: |
@@ -28,7 +28,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mrbeast.json
           git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
-          # Met à jour la branche locale avec le remote pour éviter le rejet
+          # Met à jour la branche locale pour éviter le rejet
           git pull --rebase origin main || echo "Nothing to pull"
           git push origin main
-    
