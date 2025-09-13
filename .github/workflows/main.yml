@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0  # récupère tout l’historique pour éviter les problèmes de push
+          fetch-depth: 0  # récupère tout l’historique
 
       - name: Fetch subscriber count
         run: |
@@ -30,4 +30,4 @@ jobs:
           git add mrbeast.json
           git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
           git pull --rebase origin main || echo "No changes to pull"
-          git push origin main
+          git push --force origin main
