@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -33,21 +30,20 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           git add mrbeast.json
-          git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
-          git push origin main --force
+          # Vérifier s'il y a des changements avant de committer
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update subscriber count [skip ci]"
+            git push origin main
+          fi
 
   release:
     runs-on: ubuntu-latest
-    needs: fetch_subs
-    # Ne s'exécute que lors d'un push (pas lors du schedule)
-    if: github.event_name == 'push'
+    # Ne s'exécute que lors d'un workflow_dispatch manuel
+    if: github.event_name == 'workflow_dispatch'
     
     steps:
-      - name: Wait before starting
-        run: |
-          echo "Waiting 15 seconds to avoid conflicts..."
-          sleep 15
-
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -65,11 +61,11 @@ jobs:
           VERSION_FILE="vertion.json"
 
           if [ ! -f $VERSION_FILE ]; then
-            echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
+            echo '{"version":"V1.0.0"}' > $VERSION_FILE
             echo "$VERSION_FILE created with version V1.0.0"
           fi
 
-          version=$(node -pe "require('./$VERSION_FILE').vertion")
+          version=$(node -pe "require('./$VERSION_FILE').version")
           echo "Current version: $version"
 
           version_numbers=${version#V}
@@ -89,7 +85,7 @@ jobs:
           new_version="V$major.$minor.$patch"
           echo "New version: $new_version"
 
-          node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
+          node -e "const fs = require('fs'); const data = {version:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
 
           echo "new_version=$new_version" >> $GITHUB_ENV
 
@@ -98,12 +94,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git fetch origin main
-          git reset --hard origin/main
-
           git add vertion.json
-          git diff --cached --quiet || git commit -m "Bump version to ${{ env.new_version }}"
-          git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
+          git commit -m "Bump version to ${{ env.new_version }}"
+          git push
 
       - name: Create Release
         uses: ncipollo/release-action@v1
