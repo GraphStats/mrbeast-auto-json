@@ -31,17 +31,21 @@ jobs:
         run: |
           VERSION_FILE="vertion.json"
 
+          # Créer le fichier s'il n'existe pas
           if [ ! -f $VERSION_FILE ]; then
             echo '{"vertion":"V1.0.0"}' > $VERSION_FILE
             echo "$VERSION_FILE created with version V1.0.0"
           fi
 
-          version=$(node -pe "require('./$VERSION_FILE').vertion")
+          # Lire la version actuelle avec jq (pas require)
+          version=$(jq -r '.vertion' $VERSION_FILE)
           echo "Current version: $version"
 
+          # Extraire major/minor/patch
           version_numbers=${version#V}
           IFS='.' read -r major minor patch <<< "$version_numbers"
 
+          # Incrément patch
           patch=$((patch + 1))
 
           if [ $patch -gt 9 ]; then
@@ -56,7 +60,8 @@ jobs:
           new_version="V$major.$minor.$patch"
           echo "New version: $new_version"
 
-          node -e "const fs = require('fs'); const data = {vertion:'$new_version'}; fs.writeFileSync('$VERSION_FILE', JSON.stringify(data, null, 2));"
+          # Réécrire le fichier avec la nouvelle version
+          jq -n --arg v "$new_version" '{vertion:$v}' > $VERSION_FILE
 
           echo "new_version=$new_version" >> $GITHUB_ENV
 
@@ -71,7 +76,7 @@ jobs:
 
           git add mrbeast.json vertion.json
           git diff --cached --quiet || git commit -m "Update subs + bump version to ${{ env.new_version }} [skip ci]"
-          git push --force https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} HEAD:main
 
       # Create GitHub Release
       - name: Create Release
