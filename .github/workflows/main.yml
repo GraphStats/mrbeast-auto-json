@@ -2,7 +2,7 @@ name: Fetch MrBeast Subs
 
 on:
   schedule:
-    - cron: "*/5 * * * *" # toutes les 5 minutes (minimum GitHub)
+    - cron: "*/5 * * * *" # toutes les 5 minutes
   workflow_dispatch:
 
 permissions:
@@ -15,13 +15,13 @@ jobs:
       - name: Decide if run
         id: decide
         run: |
-          # 80% de chance d'exécuter
+          # 70% de chance d'exécuter
           if [ $(( RANDOM % 10 )) -lt 7 ]; then
             echo "run=true" >> $GITHUB_OUTPUT
             echo "✅ Run (70% chance)"
           else
             echo "run=false" >> $GITHUB_OUTPUT
-            echo "❌ Skip (20% chance)"
+            echo "❌ Skip (30% chance)"
           fi
 
       - name: Checkout repo
@@ -39,8 +39,8 @@ jobs:
       - name: Commit and push
         if: steps.decide.outputs.run == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "GraphStats"
+          git config user.email "no.replybot45455@gmail.com"
           git add mrbeast.json
           git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
           git push
