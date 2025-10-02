@@ -42,5 +42,5 @@ jobs:
           git config user.name "GraphStats"
           git config user.email "no.replybot45455@gmail.com"
           git add mrbeast.json
-          git commit -m "Update subscriber count [skip ci]" || echo "No changes to commit"
+          git commit -m "Update subscriber count" || echo "No changes to commit"
           git push
